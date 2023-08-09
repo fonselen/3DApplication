@@ -34,38 +34,47 @@ typedef struct
 	double ZPlane;
 } XYZCam;
 
+XYZPoint XYZ_PointRotation(XYZPoint P, XYZPoint O, double ang);
+XYZPoint XYZ_PointTranslation(XYZPoint P, XYZPoint Vector, double t);
 void viewport_render(XYZPoint* V, int* index, XYZCam Cam, int VNum);
 void drawLine(SDL_Renderer* renderer, int xi, int yi, int xf, int yf);
-SDL_Renderer* renderer = NULL;
 
+SDL_Renderer* renderer = NULL;
 
 int main(int argc, char** argv) {
 
-	int i, j, k;
+	int i, j, k, MouseM;
 	int fat = 10;
 	XYZCam Cam1;
 	XYZPoint CubeVertices[10][8];
-	int CubeIndex[10][24];
+	XYZPoint *GroundCoordinates;
+	int CubeIndex[10][24], *GroundIndex;
 	XYZPoint P;
 	SDL_Event event;
+	double RotCamAng;
+
+	GroundCoordinates = (XYZPoint*)malloc(2002 * sizeof(XYZPoint));
+	GroundIndex = (int*)malloc(2002 * sizeof(int));
+
+	for (i = 0; i < 1001; i++)
+	{
+		GroundCoordinates[2 * i].x = -500 + i;
+		GroundCoordinates[2 * i].y = 0;
+		GroundCoordinates[2 * i].z = -500;
+
+		GroundCoordinates[2 * i + 1].x = -500 + i;
+		GroundCoordinates[2 * i + 1].y = 0;
+		GroundCoordinates[2 * i + 1].z = 500;
+
+		GroundIndex[2 * i] = 2 * i;
+		GroundIndex[2 * i + 1] = 2 * i + 1;
 
 
-		
-	Cam1.camCS.base[0].x = 0.984807753012208;
-	Cam1.camCS.base[0].y = 0;
-	Cam1.camCS.base[0].z = 0.1364817766693;
+	}
 
-	Cam1.camCS.base[1].x = 0;
-	Cam1.camCS.base[1].y = 1;
-	Cam1.camCS.base[1].z = 0;
 
-	Cam1.camCS.base[2].x = -0.17364817766693;
-	Cam1.camCS.base[2].y = 0;
-	Cam1.camCS.base[2].z = 0.984807753012208;
 
-	Cam1.camCS.Origin.x = 5;
-	Cam1.camCS.Origin.y = 1.5;
-	Cam1.camCS.Origin.z = -40;
+	
 
 	Cam1.camCS.base[0].x = 1;
 	Cam1.camCS.base[0].y = 0;
@@ -79,11 +88,13 @@ int main(int argc, char** argv) {
 	Cam1.camCS.base[2].y = 0;
 	Cam1.camCS.base[2].z = 1;
 
-	Cam1.camCS.Origin.x = 0.5;
+	Cam1.camCS.Origin.x = 0;
 	Cam1.camCS.Origin.y = 0.5;
-	Cam1.camCS.Origin.z = -30;
+	Cam1.camCS.Origin.z = -10;
 
 	Cam1.ZPlane = 0.5;
+
+	
 
 	P.x = 0;
 	P.y = 0;
@@ -134,7 +145,7 @@ int main(int argc, char** argv) {
 		CubeIndex[i][12] = 6;
 		CubeIndex[i][13] = 7;
 		CubeIndex[i][14] = 7;
-		CubeIndex[i][15] = 0;
+		CubeIndex[i][15] = 4;
 		CubeIndex[i][16] = 0;
 		CubeIndex[i][17] = 4;
 		CubeIndex[i][18] = 1;
@@ -165,53 +176,124 @@ int main(int argc, char** argv) {
 
 
 	k = 0;
-	//SDL_ShowCursor(SDL_DISABLE);
-	//SDL_SetRelativeMouseMode(SDL_TRUE);
-	while (k < 1000)
+	SDL_SetWindowGrab(window, SDL_TRUE);
+	
+	SDL_SetRelativeMouseMode(SDL_TRUE);
+	
+	while (k == 0)
 	{
-		SDL_PollEvent(&event);
+		while (SDL_PollEvent(&event))
+		{
+			
 
+			if (event.type == SDL_MOUSEMOTION)
+			{
+				MouseM = event.motion.xrel;
+
+				RotCamAng = (-MouseM * pi / 180) / 20;
+
+				Cam1.camCS.base[0] = XYZ_PointRotation(Cam1.camCS.base[0], Cam1.camCS.base[0], RotCamAng);
+				Cam1.camCS.base[2] = XYZ_PointRotation(Cam1.camCS.base[2], Cam1.camCS.base[2], RotCamAng);
+
+
+			}
+
+			if (event.type == SDL_KEYDOWN)
+			{
+				if (event.key.keysym.sym == SDLK_ESCAPE) k = 1;
+
+				if (event.key.keysym.sym == SDLK_w)
+				{
+					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, Cam1.camCS.base[2], 0.2);
+
+				}
+
+				if (event.key.keysym.sym == SDLK_s)
+				{
+					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, Cam1.camCS.base[2], -0.2);
+
+				}
+
+				if (event.key.keysym.sym == SDLK_d)
+				{
+					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, Cam1.camCS.base[0], 0.1);
+
+				}
+
+				if (event.key.keysym.sym == SDLK_a)
+				{
+					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, Cam1.camCS.base[0], -0.1);
+
+				}
+
+			}
+		}
+
+		for (i = 0; i < 10; i++)
+		{
+			viewport_render(CubeVertices[i], CubeIndex, Cam1, 12);
+			viewport_render(GroundCoordinates, GroundIndex, Cam1, 1001);
+			
+			for (j = 0; j < 8; j++)
+			{
+				CubeVertices[i][j].z = CubeVertices[i][j].z - 0.001;
+			}
+			
+			
+		}
 		//delay(40);
-		SDL_Delay(10);
+		//SDL_Delay(10);
+		drawLine(renderer, 1248, 700, 1252, 700);
+		drawLine(renderer, 1250, 698, 1250, 702);
 		SDL_RenderPresent(renderer);
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		SDL_RenderClear(renderer);
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 
-		for (i = 0; i < 10; i++)
-		{
-			viewport_render(CubeVertices[i], CubeIndex, Cam1, 12);
-			
-			for (j = 0; j < 8; j++)
-			{
-				CubeVertices[i][j].z = CubeVertices[i][j].z - 0.1;
-			}
-			
-			
-		}
-
-		k++;
 	}
+	
+	
+	SDL_SetWindowGrab(window, SDL_FALSE);
 
-	//	viewport_render(cubo[0][0], cam);
-
-
-
-		//line(0, 0, 100, 100);
-
-	//getch();
-
+	free(GroundCoordinates);
+	
+	SDL_DestroyWindow(window);
+	SDL_Quit();
 	return 0;
 }
 
 
+XYZPoint XYZ_PointRotation(XYZPoint P, XYZPoint O, double ang)
+{
+	XYZPoint Paux;
+
+	Paux = P;
+
+	Paux.x = P.x * cos(ang) - P.z * sin(ang);
+	Paux.z = P.x * sin(ang) + P.z * cos(ang);
+
+	return Paux;
+}
+
+XYZPoint XYZ_PointTranslation(XYZPoint P, XYZPoint Vector, double t)
+{
+	XYZPoint Paux;
+
+	Paux = P;
+
+	Paux.x = P.x + t * Vector.x;
+	Paux.y = P.y + t * Vector.y;
+	Paux.z = P.z + t * Vector.z;
+
+	return Paux;
+}
 
 void viewport_render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 {
 
-	XYZPoint Pa, Pb, Paux;
+	XYZPoint Pa, Pb, Paux, Dir;
 	int i;
-	double d = 0.5;
+	double d = 0.5, t;
 	
 	for (i = 0; i < VNum; i++)
 	{
@@ -236,21 +318,50 @@ void viewport_render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 		Pb.y = Cam.camCS.base[1].x * Paux.x + Cam.camCS.base[1].y * Paux.y + Cam.camCS.base[1].z * Paux.z;
 		Pb.z = Cam.camCS.base[2].x * Paux.x + Cam.camCS.base[2].y * Paux.y + Cam.camCS.base[2].z * Paux.z;
 
-		if (Pa.z >= 0.5 && Pb.z >= 0.5)
+		if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
 		{
+			if (Pa.z < Cam.ZPlane)
+			{
+				Dir.x = Pa.x - Pb.x;
+				Dir.y = Pa.y - Pb.y;
+				Dir.z = Pa.z - Pb.z;
+
+				t = (Cam.ZPlane - Pb.z) / Dir.z;
+
+				Pa.x = Pb.x + t * Dir.x;
+				Pa.y = Pb.y + t * Dir.y;
+				Pa.z = Cam.ZPlane;
+
+			}
+
+			if (Pb.z < Cam.ZPlane)
+			{
+				Dir.x = Pb.x - Pa.x;
+				Dir.y = Pb.y - Pa.y;
+				Dir.z = Pb.z - Pa.z;
+				
+
+				t = (Cam.ZPlane - Pa.z) / Dir.z;
+
+				Pb.x = Pa.x + t * Dir.x;
+				Pb.y = Pa.y + t * Dir.y;
+				Pb.z = Cam.ZPlane;
+			}
+			
 			Pa.x = (d / (d + Pa.z)) * Pa.x;
 			Pa.y = (d / (d + Pa.z)) * Pa.y;
-			Pa.z = 0;
+			Pa.z = Cam.ZPlane;
 
 			Pb.x = (d / (d + Pb.z)) * Pb.x;
 			Pb.y = (d / (d + Pb.z)) * Pb.y;
-			Pa.z = 0;
+			Pa.z = Cam.ZPlane;
 
 			Pa.x = (2500 / d) * Pa.x + 1250;
 			Pa.y = (-2500 / d) * Pa.y + 700;
 			Pb.x = (2500 / d) * Pb.x + 1250;
 			Pb.y = (-2500 / d) * Pb.y + 700;
-			drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
+
+			if(VNum < 100) drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
 		}
 		
 
@@ -274,7 +385,7 @@ void drawLine(SDL_Renderer* renderer, int xi, int yi, int xf, int yf)
 	while (1)
 	{
 
-		if (x1 <= 2500 && x1 >= 0 && y1 <= 1500 && y1 >= 0)
+		if (x1 <= 2500 && x1 >= 0 && y1 <= 1400 && y1 >= 0)
 		{
 			SDL_RenderDrawPoint(renderer, x1, y1);
 			//SDL_RenderDrawPoint(renderer, x1, y1 + 1);
