@@ -36,10 +36,9 @@ typedef struct
 
 XYZPoint XYZ_PointRotation(XYZPoint P, XYZPoint O, double ang);
 XYZPoint XYZ_PointTranslation(XYZPoint P, XYZPoint Vector, double t);
-void GroundShow(XYZCam Cam, double d, int xi, int yi, int xf, int yf);
 void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum);
+void Viewport_Ground_Render(XYZPoint** V, XYZCam Cam, int NumVertices_i, int NumVertices_j);
 void drawLine(SDL_Renderer* renderer, int xi, int yi, int xf, int yf);
-
 
 SDL_Renderer* renderer = NULL;
 
@@ -57,8 +56,8 @@ int main(int argc, char** argv) {
 	double RotCamAng;
 
 	
-	GL = 200;
-	GC = 200;
+	GL = 10000;
+	GC = 10000;
 
 	// Alocação do ponteiro duplo
 	GroundCoordinates = (XYZPoint**)malloc(GL * sizeof(XYZPoint*));
@@ -89,50 +88,13 @@ int main(int argc, char** argv) {
 			GroundCoordinates[i][j].x = -GC/2 + j;
 			GroundCoordinates[i][j].y = 0;
 			GroundCoordinates[i][j].z = -GL/2 + i;
+			//printf(" (%.2lf, %.2lf, %.2lf) ", GroundCoordinates[i][j].x, GroundCoordinates[i][j].y, GroundCoordinates[i][j].z);
 			
 		}
 
 
 	}
 
-
-	// Alocação do ponteiro duplo
-	GroundIndex1 = (int**)malloc(GL * sizeof(int*));
-	
-
-
-	if (GroundIndex1 == NULL)
-	{
-		printf("Erro ao alocar memória para o ponteiro duplo.\n");
-		return 1;
-	}
-
-	// Alocação para cada linha do ponteiro duplo
-	for (int i = 0; i < GL; i++)
-	{
-
-		GroundIndex1[i] = (int*)malloc(2 * GC * sizeof(int));
-		
-
-		if (GroundIndex1 == NULL)
-		{
-			printf("Erro ao alocar memória para a linha %d.\n", i);
-			return 1;
-		}
-	}
-
-	for (i = 0; i < GL; i ++)
-	{
-		for (j = 0; j < 2 * GC; j+=2)
-		{
-			GroundIndex1[i][j] = j/2;
-			GroundIndex1[i][j + 1] = j/2 + 1;
-			//GroundIndex2[j][i] = j / 2;
-			//GroundIndex2[j + 1][i] = j / 2 + 1;
-
-		}
-
-	}
 	
 
 	Cam1.camCS.base[0].x = 1;
@@ -287,13 +249,13 @@ int main(int argc, char** argv) {
 
 			}
 		}
-				
-		for (i = 0; i < GL; i++)
-		{
-			Viewport_Render(GroundCoordinates[i], GroundIndex1[i], Cam1, GC - 1);
-		}
+	
+		
 
-		SDL_SetRenderDrawColor(renderer, 50, 50, 150, 255);
+		Viewport_Ground_Render(GroundCoordinates, Cam1, GL, GC);
+
+
+		SDL_SetRenderDrawColor(renderer, 50, 50, 250, 255);
 		for (i = 0; i < 10; i++)
 		{
 			Viewport_Render(CubeVertices[i], CubeIndex[i], Cam1, 12);
@@ -324,12 +286,7 @@ int main(int argc, char** argv) {
 	
 	free(GroundCoordinates);
 
-	for (int i = 0; i < GL; ++i)
-	{
-		free(GroundIndex1[i]);
-	}
 	
-	free(GroundIndex1);
 
 	SDL_DestroyWindow(window);
 	SDL_Quit();
@@ -362,28 +319,12 @@ XYZPoint XYZ_PointTranslation(XYZPoint P, XYZPoint Vector, double t)
 	return Paux;
 }
 
-void GroundShow(XYZPoint **GoundCoord, XYZCam *Cam, double d, int xi, int yi, int xf, int yf)
-{
-	int i, j, k;
-
-	for (i = 0; i <= 700; i+=4)
-	{
-		k = (int)round( (255 * i) / 800);
-		SDL_SetRenderDrawColor(renderer, 0, 0, 255 - k, 255);
-		for (j = 0; j <= 2500; j++) SDL_RenderDrawPoint(renderer, j, -i + 1400);
-		//drawLine(renderer, 500, i + 700, 2000, i + 700);
-	}
-	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-	drawLine(renderer, 0, 700, 2500, 700);
-
-}
-
 void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 {
 
 	XYZPoint Pa, Pb, Paux, Dir;
 	int i;
-	double d = 0.5, t, m = 0.0, tm, tM, ty, tY, vx, vy;
+	double d = 0.5, t;
 	
 	for (i = 0; i < VNum; i++)
 	{
@@ -417,7 +358,7 @@ void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 		{
 			if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
 			{
-				//SDL_SetRenderDrawColor(renderer, 255 - 5* ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255);
+				
 				if (Pa.z < Cam.ZPlane)
 				{
 					Dir.x = Pa.x - Pb.x;
@@ -459,109 +400,7 @@ void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 				Pb.x = (2500 / d) * Pb.x + 1250;
 				Pb.y = (-2500 / d) * Pb.y + 700;
 
-
-				/*********************  Clipping  ******************************/
-				/*if (Pa.x > 2500 && Pb.x > 2500 || Pa.x < 0 && Pb.x < 0 || Pa.y > 1400 && Pb.y > 1400 || Pa.y < 0 && Pb.y < 0) return;
-
-
-				if (Pa.x < 0 || Pa.x > 2500)
-				{
-
-					vx = Pb.x - Pa.x;
-					vy = Pb.y - Pa.y;
-
-					if (vx != 0)
-					{
-						tm = (0.0 - Pa.x) / vx;
-						tM = (2500.0 - Pa.x) / vx;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pa.x = 0.0;
-							Pa.y = Pa.y + tm * vy;
-						}
-						else
-						{
-							Pa.x = 2500.0;
-							Pa.y = Pa.y + tM * vy;
-						}
-					}
-				}
-
-				if (Pa.y < 0 || Pa.y > 1400)
-				{
-
-					vx = Pb.x - Pa.x;
-					vy = Pb.y - Pa.y;
-
-					if (vy != 0)
-					{
-						tm = (0.0 - Pa.y) / vy;
-						tM = (1400.0 - Pa.y) / vy;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pa.x = Pa.x + tm * vx;
-							Pa.y = 0.0;
-						}
-						else
-						{
-							Pa.x = Pa.x + tM * vx;
-							Pa.y = 1400.0;
-						}
-					}
-				}
-
-
-
-				if (Pb.x < 0 || Pb.x > 2500)
-				{
-					vx = Pa.x - Pb.x;
-					vy = Pa.y - Pb.y;
-
-					if (vx != 0)
-					{
-						tm = (0.0 - Pb.x) / vx;
-						tM = (2500.0 - Pb.x) / vx;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pb.x = 0.0;
-							Pb.y = Pb.y + tm * vy;
-						}
-						else
-						{
-							Pb.x = 2500.0;
-							Pb.y = Pb.y + tM * vy;
-						}
-					}
-				}
-
-				if (Pb.y < 0 || Pb.y > 1400)
-				{
-					vx = Pa.x - Pb.x;
-					vy = Pa.y - Pb.y;
-
-					if (vy != 0)
-					{
-						tm = (0.0 - Pb.y) / vy;
-						tM = (1400.0 - Pb.y) / vy;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pb.x = Pb.x + tm * vx;
-							Pb.y = 0.0;
-						}
-						else
-						{
-							Pb.x = Pb.x + tM * vx;
-							Pb.y = 1400.0;
-						}
-					}
-				}*/
-				/********************** End Clipping *************************/
-
-				if (VNum < 2000) drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
+				drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
 			}
 
 		//end if
@@ -573,341 +412,141 @@ void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 
 }
 
-void Viewport_Ground_Render(XYZPoint** V, int** index, XYZCam Cam, int VNum)
+void Viewport_Ground_Render(XYZPoint** V, XYZCam Cam, int NumVertices_i, int NumVertices_j)
 {
-
 	XYZPoint Pa, Pb, Paux, Dir;
-	int i;
-	double d = 0.5, t, m = 0.0, tm, tM, ty, tY, vx, vy;
+	int i, j, VMax_i, VMax_j;
+	double d = 0.5, t, xmin, xMax, zmin, zMax;
 
-	for (i = 0; i < VNum; i++)
+	// Aqui os pontos Pa, Pb e Paux serao usados como pontos auxiliares no calculo da posicao na matriz de vertices
+	Paux = Cam.camCS.Origin; // origem da camera
+	
+	//Ponto extremo a esquerda
+	Pa.x = Cam.camCS.base[0].x * (-25) + Cam.camCS.base[1].x * 0 + Cam.camCS.base[2].x * 50 + Paux.x;
+	Pa.y = 0;
+	Pa.z = Cam.camCS.base[0].z * (-25) + Cam.camCS.base[1].z * 0 + Cam.camCS.base[2].z * 50 + Paux.z;
+	
+	//Ponto extremo a direita
+	Pb.x = Cam.camCS.base[0].x * (25) + Cam.camCS.base[1].x * 0 + Cam.camCS.base[2].x * 50 + Paux.x;
+	Pb.y = 0;
+	Pb.z = Cam.camCS.base[0].z * (25) + Cam.camCS.base[1].z * 0 + Cam.camCS.base[2].z * 50 + Paux.z;
+	
+	xmin = Paux.x;
+	xMax = Paux.x;
+	zmin = Paux.z;
+	zMax = Paux.z;
+
+
+	if (Pa.x < xmin) xmin = Pa.x;
+	if (Pb.x < xmin) xmin = Pb.x;
+
+	if (Pa.x > xMax) xMax = Pa.x;
+	if (Pb.x > xMax) xMax = Pb.x;
+
+	if (Pa.z < zmin) zmin = Pa.z;
+	if (Pb.z < zmin) zmin = Pb.z;
+
+	if (Pa.z > zMax) zMax = Pa.z;
+	if (Pb.z > zMax) zMax = Pb.z;
+
+	i = (int)round(zmin);
+	j = (int)round(xmin);
+
+	i = i - 1 + (NumVertices_i) / 2;
+	j = j - 1 + (NumVertices_j) / 2;
+
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+
+	VMax_i = (int)round(zMax);
+	VMax_j = (int)round(xMax);
+
+	VMax_i = VMax_i + (NumVertices_i) / 2;
+	VMax_j = VMax_j + (NumVertices_j) / 2;
+
+	while(i < VMax_i)
 	{
-		Pa = V[index[2 * i]];
-		Pb = V[index[2 * i + 1]];
-
-		Paux = Pa;
-		Paux.x = Paux.x - Cam.camCS.Origin.x;
-		Paux.y = Paux.y - Cam.camCS.Origin.y;
-		Paux.z = Paux.z - Cam.camCS.Origin.z;
-
-		Pa.x = Cam.camCS.base[0].x * Paux.x + Cam.camCS.base[0].y * Paux.y + Cam.camCS.base[0].z * Paux.z;
-		Pa.y = Cam.camCS.base[1].x * Paux.x + Cam.camCS.base[1].y * Paux.y + Cam.camCS.base[1].z * Paux.z;
-		Pa.z = Cam.camCS.base[2].x * Paux.x + Cam.camCS.base[2].y * Paux.y + Cam.camCS.base[2].z * Paux.z;
-
-		Paux = Pb;
-		Paux.x = Paux.x - Cam.camCS.Origin.x;
-		Paux.y = Paux.y - Cam.camCS.Origin.y;
-		Paux.z = Paux.z - Cam.camCS.Origin.z;
-
-		Pb.x = Cam.camCS.base[0].x * Paux.x + Cam.camCS.base[0].y * Paux.y + Cam.camCS.base[0].z * Paux.z;
-		Pb.y = Cam.camCS.base[1].x * Paux.x + Cam.camCS.base[1].y * Paux.y + Cam.camCS.base[1].z * Paux.z;
-		Pb.z = Cam.camCS.base[2].x * Paux.x + Cam.camCS.base[2].y * Paux.y + Cam.camCS.base[2].z * Paux.z;
-
-
-		/*if (Pa.z > 100 && Pb.z > 00) return;
-		if (Pa.x > 50 && Pb.x > 50) return;
-		if (Pa.x < -50 && Pb.x < -50) return;*/
-
-		if ((Pa.x <= 20 || Pb.x <= 20) && (Pa.x >= -20 || Pb.x >= -20) && (Pa.z <= 50 || Pb.z <= 50))
+		while(j < VMax_j)
 		{
-			if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
+			Pa = V[i][j];
+			Pb = V[i][j + 1];
+
+			Paux = Pa;
+			Paux.x = Paux.x - Cam.camCS.Origin.x;
+			Paux.y = Paux.y - Cam.camCS.Origin.y;
+			Paux.z = Paux.z - Cam.camCS.Origin.z;
+
+			Pa.x = Cam.camCS.base[0].x * Paux.x + Cam.camCS.base[0].y * Paux.y + Cam.camCS.base[0].z * Paux.z;
+			Pa.y = Cam.camCS.base[1].x * Paux.x + Cam.camCS.base[1].y * Paux.y + Cam.camCS.base[1].z * Paux.z;
+			Pa.z = Cam.camCS.base[2].x * Paux.x + Cam.camCS.base[2].y * Paux.y + Cam.camCS.base[2].z * Paux.z;
+
+			Paux = Pb;
+			Paux.x = Paux.x - Cam.camCS.Origin.x;
+			Paux.y = Paux.y - Cam.camCS.Origin.y;
+			Paux.z = Paux.z - Cam.camCS.Origin.z;
+
+			Pb.x = Cam.camCS.base[0].x * Paux.x + Cam.camCS.base[0].y * Paux.y + Cam.camCS.base[0].z * Paux.z;
+			Pb.y = Cam.camCS.base[1].x * Paux.x + Cam.camCS.base[1].y * Paux.y + Cam.camCS.base[1].z * Paux.z;
+			Pb.z = Cam.camCS.base[2].x * Paux.x + Cam.camCS.base[2].y * Paux.y + Cam.camCS.base[2].z * Paux.z;
+
+
+
+
+			if ((Pa.x <= 25 || Pb.x <= 25) && (Pa.x >= -25 || Pb.x >= -25) && (Pa.z <= 50 || Pb.z <= 50))
 			{
-				SDL_SetRenderDrawColor(renderer, 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255);
-				if (Pa.z < Cam.ZPlane)
+				if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
 				{
-					Dir.x = Pa.x - Pb.x;
-					Dir.y = Pa.y - Pb.y;
-					Dir.z = Pa.z - Pb.z;
+					SDL_SetRenderDrawColor(renderer, 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255);
+					if (Pa.z < Cam.ZPlane)
+					{
+						Dir.x = Pa.x - Pb.x;
+						Dir.y = Pa.y - Pb.y;
+						Dir.z = Pa.z - Pb.z;
 
-					t = (Cam.ZPlane - Pb.z) / Dir.z;
+						t = (Cam.ZPlane - Pb.z) / Dir.z;
 
-					Pa.x = Pb.x + t * Dir.x;
-					Pa.y = Pb.y + t * Dir.y;
+						Pa.x = Pb.x + t * Dir.x;
+						Pa.y = Pb.y + t * Dir.y;
+						Pa.z = Cam.ZPlane;
+
+					}
+
+					if (Pb.z < Cam.ZPlane)
+					{
+						Dir.x = Pb.x - Pa.x;
+						Dir.y = Pb.y - Pa.y;
+						Dir.z = Pb.z - Pa.z;
+
+
+						t = (Cam.ZPlane - Pa.z) / Dir.z;
+
+						Pb.x = Pa.x + t * Dir.x;
+						Pb.y = Pa.y + t * Dir.y;
+						Pb.z = Cam.ZPlane;
+					}
+
+					Pa.x = (d / (Pa.z)) * Pa.x;
+					Pa.y = (d / (Pa.z)) * Pa.y;
 					Pa.z = Cam.ZPlane;
 
+					Pb.x = (d / (Pb.z)) * Pb.x;
+					Pb.y = (d / (Pb.z)) * Pb.y;
+					Pa.z = Cam.ZPlane;
+
+					Pa.x = (2500 / d) * Pa.x + 1250;
+					Pa.y = (-2500 / d) * Pa.y + 700;
+					Pb.x = (2500 / d) * Pb.x + 1250;
+					Pb.y = (-2500 / d) * Pb.y + 700;
+
+					drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
 				}
 
-				if (Pb.z < Cam.ZPlane)
-				{
-					Dir.x = Pb.x - Pa.x;
-					Dir.y = Pb.y - Pa.y;
-					Dir.z = Pb.z - Pa.z;
-
-
-					t = (Cam.ZPlane - Pa.z) / Dir.z;
-
-					Pb.x = Pa.x + t * Dir.x;
-					Pb.y = Pa.y + t * Dir.y;
-					Pb.z = Cam.ZPlane;
-				}
-
-				Pa.x = (d / (Pa.z)) * Pa.x;
-				Pa.y = (d / (Pa.z)) * Pa.y;
-				Pa.z = Cam.ZPlane;
-
-				Pb.x = (d / (Pb.z)) * Pb.x;
-				Pb.y = (d / (Pb.z)) * Pb.y;
-				Pa.z = Cam.ZPlane;
-
-				Pa.x = (2500 / d) * Pa.x + 1250;
-				Pa.y = (-2500 / d) * Pa.y + 700;
-				Pb.x = (2500 / d) * Pb.x + 1250;
-				Pb.y = (-2500 / d) * Pb.y + 700;
-
-
-				/*********************  Clipping  ******************************/
-				/*if (Pa.x > 2500 && Pb.x > 2500 || Pa.x < 0 && Pb.x < 0 || Pa.y > 1400 && Pb.y > 1400 || Pa.y < 0 && Pb.y < 0) return;
-
-
-				if (Pa.x < 0 || Pa.x > 2500)
-				{
-
-					vx = Pb.x - Pa.x;
-					vy = Pb.y - Pa.y;
-
-					if (vx != 0)
-					{
-						tm = (0.0 - Pa.x) / vx;
-						tM = (2500.0 - Pa.x) / vx;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pa.x = 0.0;
-							Pa.y = Pa.y + tm * vy;
-						}
-						else
-						{
-							Pa.x = 2500.0;
-							Pa.y = Pa.y + tM * vy;
-						}
-					}
-				}
-
-				if (Pa.y < 0 || Pa.y > 1400)
-				{
-
-					vx = Pb.x - Pa.x;
-					vy = Pb.y - Pa.y;
-
-					if (vy != 0)
-					{
-						tm = (0.0 - Pa.y) / vy;
-						tM = (1400.0 - Pa.y) / vy;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pa.x = Pa.x + tm * vx;
-							Pa.y = 0.0;
-						}
-						else
-						{
-							Pa.x = Pa.x + tM * vx;
-							Pa.y = 1400.0;
-						}
-					}
-				}
-
-
-
-				if (Pb.x < 0 || Pb.x > 2500)
-				{
-					vx = Pa.x - Pb.x;
-					vy = Pa.y - Pb.y;
-
-					if (vx != 0)
-					{
-						tm = (0.0 - Pb.x) / vx;
-						tM = (2500.0 - Pb.x) / vx;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pb.x = 0.0;
-							Pb.y = Pb.y + tm * vy;
-						}
-						else
-						{
-							Pb.x = 2500.0;
-							Pb.y = Pb.y + tM * vy;
-						}
-					}
-				}
-
-				if (Pb.y < 0 || Pb.y > 1400)
-				{
-					vx = Pa.x - Pb.x;
-					vy = Pa.y - Pb.y;
-
-					if (vy != 0)
-					{
-						tm = (0.0 - Pb.y) / vy;
-						tM = (1400.0 - Pb.y) / vy;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pb.x = Pb.x + tm * vx;
-							Pb.y = 0.0;
-						}
-						else
-						{
-							Pb.x = Pb.x + tM * vx;
-							Pb.y = 1400.0;
-						}
-					}
-				}*/
-				/********************** End Clipping *************************/
-
-				if (VNum < 2000) drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
 			}
 
-			/*if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
-			{
-				if (Pa.z < Cam.ZPlane)
-				{
-					Dir.x = Pa.x - Pb.x;
-					Dir.y = Pa.y - Pb.y;
-					Dir.z = Pa.z - Pb.z;
-
-					t = (Cam.ZPlane - Pb.z) / Dir.z;
-
-					Pa.x = Pb.x + t * Dir.x;
-					Pa.y = Pb.y + t * Dir.y;
-					Pa.z = Cam.ZPlane;
-
-				}
-
-				if (Pb.z < Cam.ZPlane)
-				{
-					Dir.x = Pb.x - Pa.x;
-					Dir.y = Pb.y - Pa.y;
-					Dir.z = Pb.z - Pa.z;
-
-
-					t = (Cam.ZPlane - Pa.z) / Dir.z;
-
-					Pb.x = Pa.x + t * Dir.x;
-					Pb.y = Pa.y + t * Dir.y;
-					Pb.z = Cam.ZPlane;
-				}
-
-				Pa.x = (d / (Pa.z)) * Pa.x;
-				Pa.y = (d / (Pa.z)) * Pa.y;
-				Pa.z = Cam.ZPlane;
-
-				Pb.x = (d / (Pb.z)) * Pb.x;
-				Pb.y = (d / (Pb.z)) * Pb.y;
-				Pa.z = Cam.ZPlane;
-
-				Pa.x = (2500 / d) * Pa.x + 1250;
-				Pa.y = (-2500 / d) * Pa.y + 700;
-				Pb.x = (2500 / d) * Pb.x + 1250;
-				Pb.y = (-2500 / d) * Pb.y + 700;
-
-
-				/*********************  Clipping  ******************************/
-				/*if (Pa.x > 2500 && Pb.x > 2500 || Pa.x < 0 && Pb.x < 0 || Pa.y > 1400 && Pb.y > 1400 || Pa.y < 0 && Pb.y < 0) return;
-
-
-				if (Pa.x < 0 || Pa.x > 2500)
-				{
-
-					vx = Pb.x - Pa.x;
-					vy = Pb.y - Pa.y;
-
-					if (vx != 0)
-					{
-						tm = (0.0 - Pa.x) / vx;
-						tM = (2500.0 - Pa.x) / vx;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pa.x = 0.0;
-							Pa.y = Pa.y + tm * vy;
-						}
-						else
-						{
-							Pa.x = 2500.0;
-							Pa.y = Pa.y + tM * vy;
-						}
-					}
-				}
-
-				if (Pa.y < 0 || Pa.y > 1400)
-				{
-
-					vx = Pb.x - Pa.x;
-					vy = Pb.y - Pa.y;
-
-					if (vy != 0)
-					{
-						tm = (0.0 - Pa.y) / vy;
-						tM = (1400.0 - Pa.y) / vy;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pa.x = Pa.x + tm * vx;
-							Pa.y = 0.0;
-						}
-						else
-						{
-							Pa.x = Pa.x + tM * vx;
-							Pa.y = 1400.0;
-						}
-					}
-				}
-
-
-
-				if (Pb.x < 0 || Pb.x > 2500)
-				{
-					vx = Pa.x - Pb.x;
-					vy = Pa.y - Pb.y;
-
-					if (vx != 0)
-					{
-						tm = (0.0 - Pb.x) / vx;
-						tM = (2500.0 - Pb.x) / vx;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pb.x = 0.0;
-							Pb.y = Pb.y + tm * vy;
-						}
-						else
-						{
-							Pb.x = 2500.0;
-							Pb.y = Pb.y + tM * vy;
-						}
-					}
-				}
-
-				if (Pb.y < 0 || Pb.y > 1400)
-				{
-					vx = Pa.x - Pb.x;
-					vy = Pa.y - Pb.y;
-
-					if (vy != 0)
-					{
-						tm = (0.0 - Pb.y) / vy;
-						tM = (1400.0 - Pb.y) / vy;
-
-						if (tm < tM && tm >= 0)
-						{
-							Pb.x = Pb.x + tm * vx;
-							Pb.y = 0.0;
-						}
-						else
-						{
-							Pb.x = Pb.x + tM * vx;
-							Pb.y = 1400.0;
-						}
-					}
-				}*/
-				/********************** End Clipping *************************/
-
-				//if(VNum < 2000) drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
+			j++;
 		}
-
-
+		j = (int)round(xmin) - 1 + (NumVertices_j) / 2;
+		i++;
 	}
 
 
