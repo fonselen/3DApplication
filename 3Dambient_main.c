@@ -1,13 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <SDL.h> // Para a biblioteca SDL
-#include <conio.h>
 #include <math.h>
 
 #define pi 3.14159265358979323
 #define EXP 2.71828182845904523536
-
-
 
 typedef struct
 {
@@ -30,34 +27,62 @@ typedef struct
 
 typedef struct
 {
+	double Data[3][3];
+} XYZTransformatioMatrix;
+
+typedef struct
+{
 	XYZCoordinateSystem camCS;
-	double ZPlane;
+	double ZProjectionPlane;
+	double ZFarPlane;
+	double ProjectioPlaneWidth;
+	double ProjectionPlaneHeight;
 } XYZCam;
 
 XYZPoint XYZ_PointRotation(XYZPoint P, XYZPoint O, double ang);
 XYZPoint XYZ_PointTranslation(XYZPoint P, XYZPoint Vector, double t);
+XYZTransformatioMatrix XYZ_SetRotationMatrix(XYZPoint RotationAxis, double ang);
+XYZPoint XYZ_ApplyTransformationMatrix(XYZPoint P, XYZTransformatioMatrix M);
 void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum);
 void Viewport_Ground_Render(XYZPoint** V, XYZCam Cam, int NumVertices_i, int NumVertices_j);
 void drawLine(SDL_Renderer* renderer, int xi, int yi, int xf, int yf);
 
 SDL_Renderer* renderer = NULL;
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
 
-	int i, j, k, MouseM;
+	int i, j, k, MouseMH, MouseMV;
 	int fat = 10;
 	int GL, GC;
 	XYZCam Cam1;
-	XYZPoint CubeVertices[10][8];
+	XYZPoint CubeVertices[300][8], PiramideVertices[300][5];
 	XYZPoint **GroundCoordinates;
-	int CubeIndex[10][24], **GroundIndex1;
-	XYZPoint P;
+	XYZTransformatioMatrix M;
+	int CubeIndex[300][24], PiramideIndex[300][16];
+	XYZPoint P, WalkAxis;
 	SDL_Event event;
-	double RotCamAng;
-
+	double RotCamAngAzimutal, RotCamAngPolar;
+	XYZCoordinateSystem InertialCoordinateSystem;
+		
+	InertialCoordinateSystem.Origin.x = 0;
+	InertialCoordinateSystem.Origin.y = 0;
+	InertialCoordinateSystem.Origin.z = 0;
 	
-	GL = 10000;
-	GC = 10000;
+	InertialCoordinateSystem.base[0].x = 1;
+	InertialCoordinateSystem.base[0].y = 0;
+	InertialCoordinateSystem.base[0].z = 0;
+
+	InertialCoordinateSystem.base[1].x = 0;
+	InertialCoordinateSystem.base[1].y = 1;
+	InertialCoordinateSystem.base[1].z = 0;
+
+	InertialCoordinateSystem.base[2].x = 0;
+	InertialCoordinateSystem.base[2].y = 0;
+	InertialCoordinateSystem.base[2].z = 1;
+
+	GL = 5000;
+	GC = 5000;
 
 	// Alocação do ponteiro duplo
 	GroundCoordinates = (XYZPoint**)malloc(GL * sizeof(XYZPoint*));
@@ -86,16 +111,13 @@ int main(int argc, char** argv) {
 		for (j = 0; j < GC; j++)
 		{
 			GroundCoordinates[i][j].x = -GC/2 + j;
-			GroundCoordinates[i][j].y = 0;
+			GroundCoordinates[i][j].y = 0;// 0.5 * sin(i) * sin(j);
 			GroundCoordinates[i][j].z = -GL/2 + i;
 			//printf(" (%.2lf, %.2lf, %.2lf) ", GroundCoordinates[i][j].x, GroundCoordinates[i][j].y, GroundCoordinates[i][j].z);
 			
 		}
 
-
 	}
-
-	
 
 	Cam1.camCS.base[0].x = 1;
 	Cam1.camCS.base[0].y = 0;
@@ -113,42 +135,49 @@ int main(int argc, char** argv) {
 	Cam1.camCS.Origin.y = 0.5;
 	Cam1.camCS.Origin.z = -10;
 
-	Cam1.ZPlane = 0.5;
+	Cam1.ZProjectionPlane = 0.5;
+
+	WalkAxis = Cam1.camCS.base[2];
 
 	
 
 	P.x = 0;
 	P.y = 0;
 	P.z = 30;
-	
-
-	for (i = 0; i < 10; i++)
+	j = 0;
+	for (i = 0; i < 300; i++)
 	{
+		if(j == 10)
+		{
+			P.x += 2;
+			j = 0;
+		}
+
 		CubeVertices[i][0].x = P.x;
 		CubeVertices[i][0].y = P.y;
-		CubeVertices[i][0].z = P.z + 2 * i;
+		CubeVertices[i][0].z = P.z + 2 * j;
 		CubeVertices[i][1].x = P.x + 1;
 		CubeVertices[i][1].y = P.y;
-		CubeVertices[i][1].z = P.z + 2 * i;
+		CubeVertices[i][1].z = P.z + 2 * j;
 		CubeVertices[i][2].x = P.x + 1;
 		CubeVertices[i][2].y = P.y + 1;
-		CubeVertices[i][2].z = P.z + 2 * i;
+		CubeVertices[i][2].z = P.z + 2 * j;
 		CubeVertices[i][3].x = P.x;
 		CubeVertices[i][3].y = P.y + 1;
-		CubeVertices[i][3].z = P.z + 2 * i;
+		CubeVertices[i][3].z = P.z + 2 * j;
 
 		CubeVertices[i][4].x = P.x;
 		CubeVertices[i][4].y = P.y;
-		CubeVertices[i][4].z = P.z + 1 + 2 * i;
+		CubeVertices[i][4].z = P.z + 1 + 2 * j;
 		CubeVertices[i][5].x = P.x + 1;
 		CubeVertices[i][5].y = P.y;
-		CubeVertices[i][5].z = P.z + 1 + 2 * i;
+		CubeVertices[i][5].z = P.z + 1 + 2 * j;
 		CubeVertices[i][6].x = P.x + 1;
 		CubeVertices[i][6].y = P.y + 1;
-		CubeVertices[i][6].z = P.z + 1 + 2 * i;
+		CubeVertices[i][6].z = P.z + 1 + 2 * j;
 		CubeVertices[i][7].x = P.x;
 		CubeVertices[i][7].y = P.y + 1;
-		CubeVertices[i][7].z = P.z + 1 + 2 * i;
+		CubeVertices[i][7].z = P.z + 1 + 2 * j;
 
 
 		CubeIndex[i][0] = 0;
@@ -175,7 +204,59 @@ int main(int argc, char** argv) {
 		CubeIndex[i][21] = 6;
 		CubeIndex[i][22] = 3;
 		CubeIndex[i][23] = 7;
+		j++;
 
+	}
+
+
+
+	P.x = 0;
+	P.y = 1.1;
+	P.z = 30;
+	j = 0;
+	for (i = 0; i < 300; i++)
+	{
+		if (j == 10)
+		{
+			P.x += 2;
+			j = 0;
+		}
+
+		PiramideVertices[i][0].x = P.x;
+		PiramideVertices[i][0].y = P.y;
+		PiramideVertices[i][0].z = P.z + 2 * j;
+		PiramideVertices[i][1].x = P.x + 1;
+		PiramideVertices[i][1].y = P.y;
+		PiramideVertices[i][1].z = P.z + 2 * j;
+		PiramideVertices[i][2].x = P.x + 1;
+		PiramideVertices[i][2].y = P.y;
+		PiramideVertices[i][2].z = P.z + 2 * j + 1;
+		PiramideVertices[i][3].x = P.x;
+		PiramideVertices[i][3].y = P.y;
+		PiramideVertices[i][3].z = P.z + 2 * j + 1;
+		PiramideVertices[i][4].x = P.x + (1.0 / 2.0);
+		PiramideVertices[i][4].y = P.y +  1;
+		PiramideVertices[i][4].z = P.z + 2 * j + (1.0 / 2.0);
+
+		PiramideIndex[i][0] = 0;
+		PiramideIndex[i][1] = 1;
+		PiramideIndex[i][2] = 1;
+		PiramideIndex[i][3] = 2;
+		PiramideIndex[i][4] = 2;
+		PiramideIndex[i][5] = 3;
+		PiramideIndex[i][6] = 3;
+		PiramideIndex[i][7] = 0;
+		PiramideIndex[i][8] = 0;
+		PiramideIndex[i][9] = 4;
+		PiramideIndex[i][10] = 1;
+		PiramideIndex[i][11] = 4;
+		PiramideIndex[i][12] = 2;
+		PiramideIndex[i][13] = 4;
+		PiramideIndex[i][14] = 3;
+		PiramideIndex[i][15] = 4;
+		
+		
+		j++;
 
 	}
 
@@ -209,12 +290,27 @@ int main(int argc, char** argv) {
 
 			if (event.type == SDL_MOUSEMOTION)
 			{
-				MouseM = event.motion.xrel;
+				MouseMH = event.motion.xrel;
+				MouseMV = event.motion.yrel;
 
-				RotCamAng = (-MouseM * pi / 180) / 20;
+				RotCamAngAzimutal = (MouseMH * pi / 180) / 10;
+				RotCamAngPolar = (MouseMV * pi / 180) / 10;
+				printf("\n Azimutal = %lf - Polar = %lf", RotCamAngAzimutal, RotCamAngPolar);
 
-				Cam1.camCS.base[0] = XYZ_PointRotation(Cam1.camCS.base[0], Cam1.camCS.base[0], RotCamAng);
-				Cam1.camCS.base[2] = XYZ_PointRotation(Cam1.camCS.base[2], Cam1.camCS.base[2], RotCamAng);
+				M = XYZ_SetRotationMatrix(InertialCoordinateSystem.base[1], RotCamAngAzimutal);
+
+				Cam1.camCS.base[0] = XYZ_ApplyTransformationMatrix(Cam1.camCS.base[0], M);
+				Cam1.camCS.base[1] = XYZ_ApplyTransformationMatrix(Cam1.camCS.base[1], M);
+				Cam1.camCS.base[2] = XYZ_ApplyTransformationMatrix(Cam1.camCS.base[2], M);
+				WalkAxis = XYZ_ApplyTransformationMatrix(WalkAxis, M);
+
+				M = XYZ_SetRotationMatrix(Cam1.camCS.base[0], RotCamAngPolar);
+
+				Cam1.camCS.base[1] = XYZ_ApplyTransformationMatrix(Cam1.camCS.base[1], M);
+				Cam1.camCS.base[2] = XYZ_ApplyTransformationMatrix(Cam1.camCS.base[2], M);
+
+				//Cam1.camCS.base[0] = XYZ_PointRotation(Cam1.camCS.base[0], Cam1.camCS.base[0], RotCamAngAzimutal);
+				//Cam1.camCS.base[2] = XYZ_PointRotation(Cam1.camCS.base[2], Cam1.camCS.base[2], RotCamAngAzimutal);
 
 
 			}
@@ -225,13 +321,13 @@ int main(int argc, char** argv) {
 
 				if (event.key.keysym.sym == SDLK_w)
 				{
-					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, Cam1.camCS.base[2], 0.2);
+					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, WalkAxis, 0.2);
 
 				}
 
 				if (event.key.keysym.sym == SDLK_s)
 				{
-					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, Cam1.camCS.base[2], -0.2);
+					Cam1.camCS.Origin = XYZ_PointTranslation(Cam1.camCS.Origin, WalkAxis, -0.2);
 
 				}
 
@@ -256,11 +352,37 @@ int main(int argc, char** argv) {
 
 
 		SDL_SetRenderDrawColor(renderer, 50, 50, 250, 255);
-		for (i = 0; i < 10; i++)
+		for (i = 0; i < 300; i++)
 		{
 			Viewport_Render(CubeVertices[i], CubeIndex[i], Cam1, 12);
 		}
 
+		SDL_SetRenderDrawColor(renderer, 50, 50, 250, 255);
+		for (i = 0; i < 300; i++)
+		{
+			Viewport_Render(PiramideVertices[i], PiramideIndex[i], Cam1, 8);
+		}
+		
+		for (i = 0; i < 300; i++)
+		{
+			for (j = 0; j < 8; j++)
+			{
+				CubeVertices[i][j].z = CubeVertices[i][j].z - 0.05;
+			}
+			
+		}
+
+		for (i = 0; i < 300; i++)
+		{
+			for (j = 0; j < 5; j++)
+			{
+				PiramideVertices[i][j].z = PiramideVertices[i][j].z - 0.05;
+				//PiramideVertices[i][j].y = PiramideVertices[i][j].y + 0.001;
+			}
+
+		}
+
+		
 		
 
 		//delay(40);
@@ -319,6 +441,61 @@ XYZPoint XYZ_PointTranslation(XYZPoint P, XYZPoint Vector, double t)
 	return Paux;
 }
 
+
+XYZTransformatioMatrix XYZ_SetRotationMatrix(XYZPoint RotationAxis, double ang)
+{
+	XYZTransformatioMatrix RotMatT;
+	double I[3][3], J[3][3], JJ[3][3];
+	int i, j;
+
+	for (i = 0; i < 3; i++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			if (i == j)
+			{
+				I[i][j] = 1;
+				J[i][j] = 0;
+			}
+			else
+			{
+				I[i][j] = 0;
+			}
+		}
+	}
+
+	J[0][1] = -RotationAxis.z;
+	J[0][2] = RotationAxis.y;
+	J[1][0] = RotationAxis.z;
+	J[1][2] = -RotationAxis.x;
+	J[2][0] = -RotationAxis.y;
+	J[2][1] = RotationAxis.x;
+
+	for (i = 0; i < 3; i++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			JJ[i][j] = J[i][0] * J[0][j] + J[i][1] * J[1][j] + J[i][2] * J[2][j];
+
+			RotMatT.Data[i][j] = I[i][j] + ((sin(ang)) * J[i][j]) + ((1 - cos(ang)) * JJ[i][j]);
+		}
+	}
+
+	return RotMatT;
+}
+
+XYZPoint XYZ_ApplyTransformationMatrix(XYZPoint P, XYZTransformatioMatrix M)
+{
+	XYZPoint Q;
+
+	Q.x = M.Data[0][0] * P.x + M.Data[0][1] * P.y + M.Data[0][2] * P.z;
+	Q.y = M.Data[1][0] * P.x + M.Data[1][1] * P.y + M.Data[1][2] * P.z;
+	Q.z = M.Data[2][0] * P.x + M.Data[2][1] * P.y + M.Data[2][2] * P.z;
+
+	return Q;
+}
+
+
 void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 {
 
@@ -356,44 +533,44 @@ void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 
 		if ((Pa.x <= 25 || Pb.x <= 25) && (Pa.x >= -25 || Pb.x >= -25) && (Pa.z <= 50 || Pb.z <= 50))
 		{
-			if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
+			if (Pa.z >= Cam.ZProjectionPlane || Pb.z >= Cam.ZProjectionPlane)
 			{
 				
-				if (Pa.z < Cam.ZPlane)
+				if (Pa.z < Cam.ZProjectionPlane)
 				{
 					Dir.x = Pa.x - Pb.x;
 					Dir.y = Pa.y - Pb.y;
 					Dir.z = Pa.z - Pb.z;
 
-					t = (Cam.ZPlane - Pb.z) / Dir.z;
+					t = (Cam.ZProjectionPlane - Pb.z) / Dir.z;
 
 					Pa.x = Pb.x + t * Dir.x;
 					Pa.y = Pb.y + t * Dir.y;
-					Pa.z = Cam.ZPlane;
+					Pa.z = Cam.ZProjectionPlane;
 
 				}
 
-				if (Pb.z < Cam.ZPlane)
+				if (Pb.z < Cam.ZProjectionPlane)
 				{
 					Dir.x = Pb.x - Pa.x;
 					Dir.y = Pb.y - Pa.y;
 					Dir.z = Pb.z - Pa.z;
 
 
-					t = (Cam.ZPlane - Pa.z) / Dir.z;
+					t = (Cam.ZProjectionPlane - Pa.z) / Dir.z;
 
 					Pb.x = Pa.x + t * Dir.x;
 					Pb.y = Pa.y + t * Dir.y;
-					Pb.z = Cam.ZPlane;
+					Pb.z = Cam.ZProjectionPlane;
 				}
 
 				Pa.x = (d / (Pa.z)) * Pa.x;
 				Pa.y = (d / (Pa.z)) * Pa.y;
-				Pa.z = Cam.ZPlane;
+				Pa.z = Cam.ZProjectionPlane;
 
 				Pb.x = (d / (Pb.z)) * Pb.x;
 				Pb.y = (d / (Pb.z)) * Pb.y;
-				Pa.z = Cam.ZPlane;
+				Pa.z = Cam.ZProjectionPlane;
 
 				Pa.x = (2500 / d) * Pa.x + 1250;
 				Pa.y = (-2500 / d) * Pa.y + 700;
@@ -494,44 +671,44 @@ void Viewport_Ground_Render(XYZPoint** V, XYZCam Cam, int NumVertices_i, int Num
 
 			if ((Pa.x <= 25 || Pb.x <= 25) && (Pa.x >= -25 || Pb.x >= -25) && (Pa.z <= 50 || Pb.z <= 50))
 			{
-				if (Pa.z >= Cam.ZPlane || Pb.z >= Cam.ZPlane)
+				if (Pa.z >= Cam.ZProjectionPlane || Pb.z >= Cam.ZProjectionPlane)
 				{
 					SDL_SetRenderDrawColor(renderer, 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255 - 5 * ((int)round(Pa.z)), 255);
-					if (Pa.z < Cam.ZPlane)
+					if (Pa.z < Cam.ZProjectionPlane)
 					{
 						Dir.x = Pa.x - Pb.x;
 						Dir.y = Pa.y - Pb.y;
 						Dir.z = Pa.z - Pb.z;
 
-						t = (Cam.ZPlane - Pb.z) / Dir.z;
+						t = (Cam.ZProjectionPlane - Pb.z) / Dir.z;
 
 						Pa.x = Pb.x + t * Dir.x;
 						Pa.y = Pb.y + t * Dir.y;
-						Pa.z = Cam.ZPlane;
+						Pa.z = Cam.ZProjectionPlane;
 
 					}
 
-					if (Pb.z < Cam.ZPlane)
+					if (Pb.z < Cam.ZProjectionPlane)
 					{
 						Dir.x = Pb.x - Pa.x;
 						Dir.y = Pb.y - Pa.y;
 						Dir.z = Pb.z - Pa.z;
 
 
-						t = (Cam.ZPlane - Pa.z) / Dir.z;
+						t = (Cam.ZProjectionPlane - Pa.z) / Dir.z;
 
 						Pb.x = Pa.x + t * Dir.x;
 						Pb.y = Pa.y + t * Dir.y;
-						Pb.z = Cam.ZPlane;
+						Pb.z = Cam.ZProjectionPlane;
 					}
 
 					Pa.x = (d / (Pa.z)) * Pa.x;
 					Pa.y = (d / (Pa.z)) * Pa.y;
-					Pa.z = Cam.ZPlane;
+					Pa.z = Cam.ZProjectionPlane;
 
 					Pb.x = (d / (Pb.z)) * Pb.x;
 					Pb.y = (d / (Pb.z)) * Pb.y;
-					Pa.z = Cam.ZPlane;
+					Pa.z = Cam.ZProjectionPlane;
 
 					Pa.x = (2500 / d) * Pa.x + 1250;
 					Pa.y = (-2500 / d) * Pa.y + 700;
@@ -548,6 +725,39 @@ void Viewport_Ground_Render(XYZPoint** V, XYZCam Cam, int NumVertices_i, int Num
 		j = (int)round(xmin) - 1 + (NumVertices_j) / 2;
 		i++;
 	}
+
+
+
+}
+
+
+void XYZ_SetCamera(XYZCam* Cam, double x, double y, double z, double YawAng, double PitchAng, double RollAng, double ZFarPlane, double ProjectionPlaneWidth, double ProjectionPlaneHeight)
+{
+	//Define as coordenadas da camera dentro do sistema de coordenadas do mundo
+	(*Cam).camCS.Origin.x = x;
+	(*Cam).camCS.Origin.y = y;
+	(*Cam).camCS.Origin.z = z;
+
+	//Define os vetores da base do sistema de coordenadas da camera em funcao dos angulos de orientac/ao
+	//os angulos serao considerados em coordenadas esfericas e definirao a orientacao do eixo z
+	//vetor f2 (terceiro vetor da base)
+	/*(*Cam).camCS.base[2].x = sin(ViewPolarAng) * cos(ViewAzimuthalAng);
+	(*Cam).camCS.base[2].y = sin(ViewPolarAng) * sin(ViewAzimuthalAng);
+	(*Cam).camCS.base[2].z = cos(ViewPolarAng);
+	//Eixo f0 (primeiro vetor da base)
+	(*Cam).camCS.base[0].x = sin(ViewPolarAng) * cos(ViewAzimuthalAng);
+	(*Cam).camCS.base[0].y = sin(ViewPolarAng) * sin(ViewAzimuthalAng);
+	(*Cam).camCS.base[0].z = cos(ViewPolarAng);
+	//Eixo f1 (segundo vetor da base)
+	(*Cam).camCS.base[1].x = sin(ViewPolarAng) * cos(ViewAzimuthalAng);
+	(*Cam).camCS.base[1].y = sin(ViewPolarAng) * sin(ViewAzimuthalAng);
+	(*Cam).camCS.base[1].z = cos(ViewPolarAng);*/
+
+	//Define
+
+
+
+
 
 
 }
