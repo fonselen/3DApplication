@@ -47,6 +47,9 @@ void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum);
 void Viewport_Ground_Render(XYZPoint** V, XYZCam Cam, int NumVertices_i, int NumVertices_j);
 void drawLine(SDL_Renderer* renderer, int xi, int yi, int xf, int yf);
 
+void XYZ_SetSphericalObject(XYZPoint* S, int* V_index);
+
+
 SDL_Renderer* renderer = NULL;
 
 int main(int argc, char** argv)
@@ -56,15 +59,17 @@ int main(int argc, char** argv)
 	int fat = 10;
 	int GL, GC;
 	XYZCam Cam1;
-	XYZPoint CubeVertices[300][8], PiramideVertices[300][5];
+	XYZPoint CubeVertices[300][8], PiramideVertices[300][5], SphereVertices[1000];
 	XYZPoint **GroundCoordinates;
-	XYZTransformatioMatrix M;
-	int CubeIndex[300][24], PiramideIndex[300][16];
+	XYZTransformatioMatrix M, M_Esfera;
+	int CubeIndex[300][24], PiramideIndex[300][16], SphereIndex[1000];
 	XYZPoint P, WalkAxis;
 	SDL_Event event;
 	double RotCamAngAzimutal, RotCamAngPolar;
 	XYZCoordinateSystem InertialCoordinateSystem;
-		
+	
+	XYZ_SetSphericalObject(SphereVertices, SphereIndex);
+	
 	InertialCoordinateSystem.Origin.x = 0;
 	InertialCoordinateSystem.Origin.y = 0;
 	InertialCoordinateSystem.Origin.z = 0;
@@ -80,6 +85,16 @@ int main(int argc, char** argv)
 	InertialCoordinateSystem.base[2].x = 0;
 	InertialCoordinateSystem.base[2].y = 0;
 	InertialCoordinateSystem.base[2].z = 1;
+
+	/*M_Esfera = XYZ_SetRotationMatrix(InertialCoordinateSystem.base[0], 90 * (pi / 180));
+
+	for (i = 0; i < 182; i++)
+	{
+		SphereVertices[i] = XYZ_ApplyTransformationMatrix(SphereVertices[i], M_Esfera);
+	}*/
+
+	M_Esfera = XYZ_SetRotationMatrix(InertialCoordinateSystem.base[1], 1 * (pi / 180));
+
 
 	GL = 5000;
 	GC = 5000;
@@ -139,8 +154,6 @@ int main(int argc, char** argv)
 
 	WalkAxis = Cam1.camCS.base[2];
 
-	
-
 	P.x = 0;
 	P.y = 0;
 	P.z = 30;
@@ -149,8 +162,8 @@ int main(int argc, char** argv)
 	{
 		if(j == 10)
 		{
-			P.x += 2;
-			j = 0;
+			//P.x += 2;
+			//j = 0;
 		}
 
 		CubeVertices[i][0].x = P.x;
@@ -218,8 +231,8 @@ int main(int argc, char** argv)
 	{
 		if (j == 10)
 		{
-			P.x += 2;
-			j = 0;
+			//P.x += 2;
+			//j = 0;
 		}
 
 		PiramideVertices[i][0].x = P.x;
@@ -352,39 +365,43 @@ int main(int argc, char** argv)
 
 
 		SDL_SetRenderDrawColor(renderer, 50, 50, 250, 255);
-		for (i = 0; i < 300; i++)
+		/*for (i = 0; i < 300; i++)
 		{
 			Viewport_Render(CubeVertices[i], CubeIndex[i], Cam1, 12);
-		}
+		}*/
 
 		SDL_SetRenderDrawColor(renderer, 50, 50, 250, 255);
-		for (i = 0; i < 300; i++)
+		/*for (i = 0; i < 300; i++)
 		{
 			Viewport_Render(PiramideVertices[i], PiramideIndex[i], Cam1, 8);
-		}
+		}*/
 		
-		for (i = 0; i < 300; i++)
+		Viewport_Render(SphereVertices, SphereIndex, Cam1, 380);
+
+		/* or (i = 0; i < 300; i++)
 		{
 			for (j = 0; j < 8; j++)
 			{
-				CubeVertices[i][j].z = CubeVertices[i][j].z - 0.05;
+				//CubeVertices[i][j].z = CubeVertices[i][j].z - 0.05;
 			}
 			
-		}
+		}*/
 
-		for (i = 0; i < 300; i++)
+		/*for (i = 0; i < 300; i++)
 		{
 			for (j = 0; j < 5; j++)
 			{
 				PiramideVertices[i][j].z = PiramideVertices[i][j].z - 0.05;
-				//PiramideVertices[i][j].y = PiramideVertices[i][j].y + 0.001;
+				PiramideVertices[i][j].y = PiramideVertices[i][j].y + 0.001;
 			}
 
+		}*/
+
+		for (i = 0; i < 182; i++)
+		{
+			SphereVertices[i] = XYZ_ApplyTransformationMatrix(SphereVertices[i], M_Esfera);
 		}
-
 		
-		
-
 		//delay(40);
 		//SDL_Delay(10);
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -578,6 +595,7 @@ void Viewport_Render(XYZPoint* V, int* index, XYZCam Cam, int VNum)
 				Pb.y = (-2500 / d) * Pb.y + 700;
 
 				drawLine(renderer, Pa.x, Pa.y, Pb.x, Pb.y);
+				//SDL_RenderPresent(renderer);
 			}
 
 		//end if
@@ -798,4 +816,124 @@ void drawLine(SDL_Renderer* renderer, int xi, int yi, int xf, int yf)
 			y1 += sy;
 		}
 	}
+}
+
+void XYZ_SetSphericalObject(XYZPoint* S, int* V_index)
+{
+	int i, j;
+	double Theta, Phi;
+
+	i = 0;
+
+	Theta = 0;
+	Phi = pi / 10;
+
+	while (Phi < pi)
+	{
+		while (Theta < 2 * pi)
+		{
+			S[i].x = cos(Theta) * sin(Phi);
+			S[i].y = 1 + sin(Theta) * sin(Phi);
+			S[i].z = cos(Phi);
+
+			Theta += 2 * pi / 20;
+			i++;
+		}
+		Theta = 0;
+		Phi += pi / 10;
+	}
+
+	S[i].x = 0;
+	S[i].y = 1;
+	S[i].z = 1;
+
+	i++;
+
+	S[i].x = 0;
+	S[i].y = 1;
+	S[i].z = -1;
+
+	j = 0;
+
+	for (i = 0; i < 9; i ++)
+	{
+		while (j < (i + 1) * 20)
+		{
+			V_index[2 * j] = j;
+			V_index[2 * j + 1] = j + 1;
+			if(j + 1 == (i + 1) * 20) V_index[2 * j + 1] = j + 1 - 20;
+
+			j ++;
+		}
+	}
+
+	j = j * 2;
+
+	for (i = 0; i < 20; i++)
+	{
+		V_index[j] = 180;
+		j++;
+		
+		V_index[j] = 0 + i;
+		j++;
+		
+		V_index[j] = 0 + i;
+		j++;
+		
+		V_index[j] = 20 + i;
+		j++;
+		
+		V_index[j] = 20 + i;
+		j++;
+		
+		V_index[j] = 40 + i;
+		j++;
+		
+		V_index[j] = 40 + i;
+		j++;
+		
+		V_index[j] = 60 + i;
+		j++;
+
+		V_index[j] = 60 + i;
+		j++;
+
+		V_index[j] = 80 + i;
+		j++;
+
+		V_index[j] = 80 + i;
+		j++;
+
+		V_index[j] = 100 + i;
+		j++;
+
+		V_index[j] = 100 + i;
+		j++;
+
+		V_index[j] = 120 + i;
+		j++;
+
+		V_index[j] = 120 + i;
+		j++;
+
+		V_index[j] = 140 + i;
+		j++;
+
+		V_index[j] = 140 + i;
+		j++;
+		
+		V_index[j] = 160 + i;
+		j++;
+		
+		V_index[j] = 160 + i;
+		j++;
+		
+		V_index[j] = 181;
+		j++;
+
+
+	}
+
+	j = j;
+
 }
